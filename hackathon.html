@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Voice Modulation</title>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #0d1117;
+            color: white;
+            transition: background-color 0.5s ease;
+        }
+        h2 {
+            color: #00bcd4;
+        }
+        .container {
+            background: #161b22;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 12px rgba(0, 255, 255, 0.2);
+            display: inline-block;
+            margin-top: 20px;
+            width: 50%;
+        }
+        .controls {
+            margin-top: 20px;
+            text-align: left;
+        }
+        button {
+            background-color: #00bcd4;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            margin: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: #008ba3;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        input[type='range'], input[type='text'] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: none;
+            font-size: 16px;
+        }
+        canvas {
+            width: 100%;
+            height: 100px;
+            background: black;
+        }
+    </style>
+</head>
+<body>
+    <h2>🎤 86. Build a real-time voice modulation tool for privacy in calls. 🎶</h2>
+    <div class="container">
+        <button id="start">🎙️ Start Modulation</button>
+        <button id="stop">🛑 Stop</button>
+        <button id="record">🔴 Record</button>
+        <button id="playback">▶️ Play</button>
+        <button id="toggle-theme">🌗 Toggle Theme</button>
+        <input type="text" id="prompt" placeholder="Enter voice effect (e.g., 'robotic', 'deep', 'alien')">
+        <canvas id="visualizer"></canvas>
+        <div class="controls">
+            <div class="slider-container">
+                <label>🎵 Pitch Shift:</label>
+                <input type="range" id="pitch" min="0.5" max="2" step="0.1" value="1">
+            </div>
+            <div class="slider-container">
+                <label>🌊 Reverb:</label>
+                <input type="range" id="reverb" min="0" max="1" step="0.1" value="0">
+            </div>
+            <div class="slider-container">
+                <label>🔄 Echo:</label>
+                <input type="range" id="echo" min="0" max="1" step="0.1" value="0">
+            </div>
+        </div>
+    </div>
+    <script>
+        let audioContext, mediaStream, source, pitchShiftNode, reverbNode, echoNode, recorder, recordedChunks = [];
+        let isDarkMode = true;
+        
+        document.getElementById('start').addEventListener('click', async () => {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            source = audioContext.createMediaStreamSource(mediaStream);
+            
+            pitchShiftNode = audioContext.createBiquadFilter();
+            pitchShiftNode.type = "peaking";
+            pitchShiftNode.frequency.value = 1000;
+            
+            reverbNode = audioContext.createGain();
+            echoNode = audioContext.createDelay();
+            echoNode.delayTime.value = 0.5;
+            
+            source.connect(pitchShiftNode);
+            pitchShiftNode.connect(reverbNode);
+            reverbNode.connect(echoNode);
+            echoNode.connect(audioContext.destination);
+            
+            visualizeAudio(source);
+        });
+        
+        document.getElementById('stop').addEventListener('click', () => {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                audioContext.close();
+            }
+        });
+        
+        document.getElementById('prompt').addEventListener('change', (event) => {
+            const input = event.target.value.toLowerCase();
+            const effects = {
+                'robotic': { pitch: 1.5, reverb: 0.8, echo: 0.5 },
+                'deep': { pitch: 0.7, reverb: 0.3, echo: 0.2 },
+                'echo': { pitch: 1, reverb: 0.2, echo: 0.9 },
+                'alien': { pitch: 1.8, reverb: 0.9, echo: 0.7 },
+                'whisper': { pitch: 0.8, reverb: 0.1, echo: 0.3 }
+            };
+            
+            for (let key in effects) {
+                if (input.includes(key)) {
+                    document.getElementById('pitch').value = effects[key].pitch;
+                    document.getElementById('reverb').value = effects[key].reverb;
+                    document.getElementById('echo').value = effects[key].echo;
+                    break;
+                }
+            }
+        });
+        
+        document.getElementById('toggle-theme').addEventListener('click', () => {
+            document.body.style.backgroundColor = isDarkMode ? 'white' : '#0d1117';
+            document.body.style.color = isDarkMode ? 'black' : 'white';
+            isDarkMode = !isDarkMode;
+        });
+        
+        function visualizeAudio(source) {
+            const canvas = document.getElementById('visualizer');
+            const canvasCtx = canvas.getContext('2d');
+            const analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            function draw() {
+                requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+                canvasCtx.fillStyle = 'black';
+                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let x = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = dataArray[i];
+                    canvasCtx.fillStyle = 'cyan';
+                    canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            }
+            draw();
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Speech AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #eef2f3;
+        }
+        .container {
+            width: 400px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            resize: none;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Text to Speech Generator</h2>
+        <textarea id="textInput" placeholder="Enter text here..."></textarea>
+        <select id="voiceSelect"></select>
+        <button onclick="speakText()">Convert to Speech</button>
+    </div>
+    
+    <script>
+        let voices = [];
+        function loadVoices() {
+            voices = speechSynthesis.getVoices();
+            const voiceSelect = document.getElementById("voiceSelect");
+            voiceSelect.innerHTML = '';
+            voices.forEach((voice, index) => {
+                const option = document.createElement("option");
+                option.value = index;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+        }
+        
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        
+        function speakText() {
+            const textInput = document.getElementById("textInput").value;
+            if (!textInput) return;
+            
+            const utterance = new SpeechSynthesisUtterance(textInput);
+            const selectedVoice = document.getElementById("voiceSelect").value;
+            utterance.voice = voices[selectedVoice];
+            
+            speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html> -->
+
+
+
